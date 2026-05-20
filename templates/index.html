@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ElectroScan — Election Scoresheet Anomaly Detector</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #0f1117;
+      --paper: #f5f2eb;
+      --cream: #ede9df;
+      --green: #1a6b3c;
+      --green-light: #d4edd9;
+      --red: #8b1a1a;
+      --red-light: #f0d4d4;
+      --gold: #c4962a;
+      --gold-light: #f5e9cc;
+      --border: #c8c2b4;
+      --muted: #7a7468;
+    }
+
+    body {
+      background-color: var(--paper);
+      color: var(--ink);
+      font-family: 'Instrument Sans', sans-serif;
+      min-height: 100vh;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(0,0,0,0.04) 28px),
+        repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(0,0,0,0.02) 28px);
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 2px solid var(--ink);
+      padding: 0 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--ink);
+      color: var(--paper);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo-block { display: flex; align-items: baseline; gap: 0.6rem; padding: 1rem 0; }
+    .logo-name { font-family: 'DM Serif Display', serif; font-size: 1.7rem; letter-spacing: -0.02em; color: var(--paper); }
+    .logo-badge { font-family: 'DM Mono', monospace; font-size: 0.62rem; background: var(--gold); color: var(--ink); padding: 0.15rem 0.45rem; border-radius: 2px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
+    .header-meta { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: #888; letter-spacing: 0.05em; text-align: right; line-height: 1.7; }
+
+    /* ── Main ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+    .hero { margin-bottom: 2.5rem; }
+    .hero h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 0.6rem; }
+    .hero h1 em { font-style: italic; color: var(--green); }
+    .hero p { color: var(--muted); font-size: 0.95rem; max-width: 540px; line-height: 1.65; }
+
+    /* ── Upload card ── */
+    .card { background: #fff; border: 1.5px solid var(--border); border-radius: 6px; overflow: hidden; box-shadow: 4px 4px 0 var(--border); }
+    .card-header { background: var(--cream); border-bottom: 1.5px solid var(--border); padding: 0.85rem 1.5rem; display: flex; align-items: center; gap: 0.6rem; }
+    .card-header-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
+    .card-header span { font-family: 'DM Mono', monospace; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .card-body { padding: 2rem 1.5rem; }
+
+    /* ── Drop zone ── */
+    .drop-zone { border: 2px dashed var(--border); border-radius: 4px; padding: 3rem 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s ease; background: var(--paper); position: relative; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: var(--green); background: var(--green-light); }
+    .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { width: 52px; height: 52px; margin: 0 auto 1rem; background: var(--ink); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .drop-icon svg { width: 22px; height: 22px; stroke: var(--paper); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .drop-title { font-family: 'DM Serif Display', serif; font-size: 1.15rem; margin-bottom: 0.4rem; }
+    .drop-sub { font-size: 0.8rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+    /* ── Preview ── */
+    #preview-wrap { display: none; margin-top: 1.5rem; gap: 1rem; align-items: flex-start; }
+    #preview-wrap.visible { display: flex; flex-wrap: wrap; }
+    #preview-img { width: 120px; height: 120px; object-fit: cover; border-radius: 4px; border: 1.5px solid var(--border); }
+    .preview-meta { flex: 1; min-width: 180px; }
+    .preview-filename { font-family: 'DM Mono', monospace; font-size: 0.78rem; font-weight: 500; color: var(--ink); margin-bottom: 0.3rem; word-break: break-all; }
+    .preview-size { font-size: 0.75rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .btn-remove { font-size: 0.72rem; color: var(--red); background: none; border: none; cursor: pointer; font-family: 'DM Mono', monospace; padding: 0; margin-top: 0.5rem; text-decoration: underline; }
+
+    /* ── Submit ── */
+    .btn-primary { margin-top: 1.5rem; width: 100%; padding: 0.95rem; background: var(--ink); color: var(--paper); font-family: 'Instrument Sans', sans-serif; font-size: 0.95rem; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; transition: background 0.18s, transform 0.1s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .btn-primary:hover:not(:disabled) { background: #2a2d38; }
+    .btn-primary:active:not(:disabled) { transform: scale(0.99); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+    .btn-primary.loading .spinner { display: block; }
+    .btn-primary.loading .btn-text { opacity: 0.7; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Stats strip ── */
+    .info-strip { margin-top: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+    .info-tile { background: #fff; border: 1.5px solid var(--border); border-radius: 4px; padding: 1rem 1.2rem; box-shadow: 3px 3px 0 var(--border); }
+    .info-tile-label { font-family: 'DM Mono', monospace; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.35rem; }
+    .info-tile-value { font-family: 'DM Serif Display', serif; font-size: 1.05rem; color: var(--ink); }
+
+    /* ══════════════════════════════════
+       ── Results Section ──
+    ══════════════════════════════════ */
+    .results-section { margin-top: 3rem; }
+    .results-section-title { font-family: 'DM Serif Display', serif; font-size: 1.5rem; letter-spacing: -0.02em; margin-bottom: 0.4rem; }
+    .results-section-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 1.5rem; font-family: 'DM Mono', monospace; }
+
+    /* Two column groups */
+    .results-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .results-columns { grid-template-columns: 1fr; } }
+
+    .results-group { border: 1.5px solid var(--border); border-radius: 6px; overflow: hidden; box-shadow: 3px 3px 0 var(--border); }
+    .results-group-header { padding: 0.75rem 1.1rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid var(--border); }
+    .results-group.normal .results-group-header { background: var(--green-light); }
+    .results-group.anomaly .results-group-header { background: var(--red-light); }
+    .results-group-label { font-family: 'DM Mono', monospace; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; }
+    .results-group.normal .results-group-label { color: var(--green); }
+    .results-group.anomaly .results-group-label { color: var(--red); }
+    .results-group-count { font-family: 'DM Serif Display', serif; font-size: 1.1rem; }
+    .results-group.normal .results-group-count { color: var(--green); }
+    .results-group.anomaly .results-group-count { color: var(--red); }
+
+    /* Card grid inside each group */
+    .results-group-body { background: var(--paper); min-height: 120px; padding: 0.85rem; }
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
+
+    /* Empty state */
+    .group-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; color: var(--border); font-family: 'DM Mono', monospace; font-size: 0.72rem; letter-spacing: 0.06em; gap: 0.5rem; }
+    .group-empty svg { width: 28px; height: 28px; stroke: var(--border); fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Result card (grid item) ── */
+    .result-card {
+      background: #fff;
+      border: 1.5px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: slideIn 0.3s ease both;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .result-card:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .result-card-thumb {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      background: var(--cream);
+      display: block;
+    }
+
+    .result-card-thumb-placeholder {
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: var(--cream);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .result-card-thumb-placeholder svg { width: 28px; height: 28px; stroke: var(--border); fill: none; stroke-width: 1.5; }
+
+    .result-card-body { padding: 0.55rem 0.65rem; flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
+
+    .result-card-name {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.67rem;
+      font-weight: 500;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .result-card-score-row { display: flex; align-items: center; justify-content: space-between; }
+
+    .result-card-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding: 0.14rem 0.38rem;
+      border-radius: 2px;
+    }
+    .result-card.normal .result-card-badge { background: var(--green-light); color: var(--green); }
+    .result-card.anomaly .result-card-badge { background: var(--red-light); color: var(--red); }
+
+    .result-card-score {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--muted);
+    }
+
+    /* Anomaly score bar */
+    .score-bar-bg { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 0.2rem; }
+    .score-bar-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; }
+    .result-card.normal .score-bar-fill { background: var(--green); }
+    .result-card.anomaly .score-bar-fill { background: var(--red); }
+
+    /* View button */
+    .result-card-footer { border-top: 1px solid var(--border); }
+    .btn-view {
+      width: 100%;
+      padding: 0.45rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-view svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .result-card.normal .btn-view:hover { background: var(--green-light); color: var(--green); }
+    .result-card.anomaly .btn-view:hover { background: var(--red-light); color: var(--red); }
+
+    /* ── Lightbox ── */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(10, 10, 15, 0.92);
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .lightbox.open { display: flex; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .lightbox-inner {
+      position: relative;
+      max-width: 90vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 75vh;
+      object-fit: contain;
+      border-radius: 4px;
+      border: 2px solid rgba(255,255,255,0.1);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .lightbox-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .lightbox-filename {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .lightbox-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.6rem;
+      border-radius: 3px;
+    }
+    .lightbox-badge.normal { background: var(--green-light); color: var(--green); }
+    .lightbox-badge.anomaly { background: var(--red-light); color: var(--red); }
+
+    .lightbox-score {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .lightbox-close {
+      position: fixed;
+      top: 1.2rem;
+      right: 1.5rem;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      z-index: 1000;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── Animate in ── */
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.4s ease both; }
+
+    /* ── Footer ── */
+    footer { text-align: center; padding: 1.5rem; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.06em; border-top: 1px solid var(--border); margin-top: 3rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-block">
+    <span class="logo-name">ElectroScan</span>
+  </div>
+  <div class="header-meta">
+    Election Integrity Suite<br>
+    Anomaly Detection System
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Scoresheet <em>Anomaly</em><br>Detection</h1>
+    <p>Upload scanned election result scoresheets to check for irregularities. Each scan is logged and grouped by outcome below.</p>
+  </div>
+
+  <!-- Upload card -->
+  <div class="card fade-up">
+    <div class="card-header">
+      <div class="card-header-dot"></div>
+      <span>Upload Scoresheet</span>
+    </div>
+    <div class="card-body">
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept="image/*" />
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="drop-title">Drop scoresheet here</div>
+        <div class="drop-sub">or click to browse — JPG, PNG supported</div>
+      </div>
+
+      <div id="preview-wrap">
+        <img id="preview-img" src="" alt="Preview" />
+        <div class="preview-meta">
+          <div class="preview-filename" id="preview-filename">—</div>
+          <div class="preview-size" id="preview-size">—</div>
+          <button class="btn-remove" id="btn-remove">Remove file</button>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-submit" disabled>
+        <div class="spinner"></div>
+        <span class="btn-text">Analyse Scoresheet</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats strip -->
+  <div class="info-strip">
+    <div class="info-tile fade-up" style="animation-delay:0.08s">
+      <div class="info-tile-label">Total Scanned</div>
+      <div class="info-tile-value" id="tile-scanned">0</div>
+    </div>
+    <div class="info-tile fade-up" style="animation-delay:0.14s">
+      <div class="info-tile-label">Normal</div>
+      <div class="info-tile-value" id="tile-normal" style="color:var(--green)">0</div>
+    </div>
+    <div class="info-tile fade-up" style="animation-delay:0.2s">
+      <div class="info-tile-label">Anomalous</div>
+      <div class="info-tile-value" id="tile-anomaly" style="color:var(--red)">0</div>
+    </div>
+    <div class="info-tile fade-up" style="animation-delay:0.26s">
+      <div class="info-tile-label">Flag Rate</div>
+      <div class="info-tile-value" id="tile-rate">—</div>
+    </div>
+  </div>
+
+  <!-- Results history -->
+  <div class="results-section fade-up" style="animation-delay:0.35s">
+    <div class="results-section-title">Scan Results</div>
+    <div class="results-section-sub">Click any card or press View to inspect the full scoresheet image</div>
+
+    <div class="results-columns">
+      <!-- Normal group -->
+      <div class="results-group normal">
+        <div class="results-group-header">
+          <span class="results-group-label">✓ &nbsp;Normal Scoresheets</span>
+          <span class="results-group-count" id="count-normal">0</span>
+        </div>
+        <div class="results-group-body">
+          <div class="cards-grid" id="group-normal"></div>
+          <div class="group-empty" id="empty-normal">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+            No normal results yet
+          </div>
+        </div>
+      </div>
+
+      <!-- Anomaly group -->
+      <div class="results-group anomaly">
+        <div class="results-group-header">
+          <span class="results-group-label">⚠ &nbsp;Anomalous Scoresheets</span>
+          <span class="results-group-count" id="count-anomaly">0</span>
+        </div>
+        <div class="results-group-body">
+          <div class="cards-grid" id="group-anomaly"></div>
+          <div class="group-empty" id="empty-anomaly">
+            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            No anomalies flagged yet
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>ELECTROSCAN &nbsp;·&nbsp; ELECTION INTEGRITY SUITE &nbsp;·&nbsp; FOR AUTHORISED USE ONLY</footer>
+
+<!-- ── Lightbox ── -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightbox-close">✕</button>
+  <div class="lightbox-inner">
+    <img id="lightbox-img" src="" alt="Full scoresheet" />
+    <div class="lightbox-meta">
+      <span class="lightbox-filename" id="lightbox-filename"></span>
+      <span class="lightbox-badge" id="lightbox-badge"></span>
+      <span class="lightbox-score" id="lightbox-score"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const dropZone    = document.getElementById('drop-zone');
+  const fileInput   = document.getElementById('file-input');
+  const previewWrap = document.getElementById('preview-wrap');
+  const previewImg  = document.getElementById('preview-img');
+  const previewName = document.getElementById('preview-filename');
+  const previewSize = document.getElementById('preview-size');
+  const btnRemove   = document.getElementById('btn-remove');
+  const btnSubmit   = document.getElementById('btn-submit');
+
+  const tileScanned  = document.getElementById('tile-scanned');
+  const tileNormal   = document.getElementById('tile-normal');
+  const tileAnomaly  = document.getElementById('tile-anomaly');
+  const tileRate     = document.getElementById('tile-rate');
+  const countNormal  = document.getElementById('count-normal');
+  const countAnomaly = document.getElementById('count-anomaly');
+  const groupNormal  = document.getElementById('group-normal');
+  const groupAnomaly = document.getElementById('group-anomaly');
+  const emptyNormal  = document.getElementById('empty-normal');
+  const emptyAnomaly = document.getElementById('empty-anomaly');
+
+  const lightbox     = document.getElementById('lightbox');
+  const lbImg        = document.getElementById('lightbox-img');
+  const lbFilename   = document.getElementById('lightbox-filename');
+  const lbBadge      = document.getElementById('lightbox-badge');
+  const lbScore      = document.getElementById('lightbox-score');
+  const lbClose      = document.getElementById('lightbox-close');
+
+  let selectedFile = null;
+  let stats = { total: 0, normal: 0, anomaly: 0 };
+
+  function formatBytes(b) {
+    return b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(2)+' MB';
+  }
+
+  function loadFile(file) {
+    selectedFile = file;
+    previewName.textContent = file.name;
+    previewSize.textContent = formatBytes(file.size);
+    const reader = new FileReader();
+    reader.onload = e => { previewImg.src = e.target.result; };
+    reader.readAsDataURL(file);
+    previewWrap.classList.add('visible');
+    btnSubmit.disabled = false;
+  }
+
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+
+  btnRemove.addEventListener('click', () => {
+    selectedFile = null; fileInput.value = '';
+    previewWrap.classList.remove('visible');
+    btnSubmit.disabled = true;
+  });
+
+  btnSubmit.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    btnSubmit.classList.add('loading');
+    btnSubmit.disabled = true;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    const thumbSrc = previewImg.src;
+    const fileName = selectedFile.name;
+    const fileSize = formatBytes(selectedFile.size);
+
+    try {
+      const res  = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) {
+        alert('Error: ' + data.error);
+      } else {
+        const isAnomaly = data.result === 'Anomaly';
+        addResultCard(isAnomaly, fileName, fileSize, thumbSrc, data.confidence);
+        updateStats(isAnomaly);
+      }
+    } catch (err) {
+      alert('Server error — could not complete request.');
+    } finally {
+      btnSubmit.classList.remove('loading');
+      selectedFile = null; fileInput.value = '';
+      previewWrap.classList.remove('visible');
+      btnSubmit.disabled = true;
+    }
+  });
+
+  function updateStats(isAnomaly) {
+    stats.total++;
+    if (isAnomaly) stats.anomaly++; else stats.normal++;
+    tileScanned.textContent = stats.total;
+    tileNormal.textContent  = stats.normal;
+    tileAnomaly.textContent = stats.anomaly;
+    const rate = Math.round((stats.anomaly / stats.total) * 100);
+    tileRate.textContent = rate + '%';
+    countNormal.textContent  = stats.normal;
+    countAnomaly.textContent = stats.anomaly;
+  }
+
+  function openLightbox(src, name, isAnomaly, score) {
+    lbImg.src = src;
+    lbFilename.textContent = name;
+    lbBadge.textContent    = isAnomaly ? 'Anomaly' : 'Normal';
+    lbBadge.className      = 'lightbox-badge ' + (isAnomaly ? 'anomaly' : 'normal');
+    // Show anomaly score (raw score) as percentage
+    const pct = isAnomaly
+      ? Math.round(score * 100) + '% anomaly score'
+      : Math.round((1 - score) * 100) + '% normal confidence';
+    lbScore.textContent = pct;
+    lightbox.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  lbClose.addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+  function addResultCard(isAnomaly, name, size, thumbSrc, score) {
+    const type  = isAnomaly ? 'anomaly' : 'normal';
+    const group = isAnomaly ? groupAnomaly : groupNormal;
+    const emptyEl = isAnomaly ? emptyAnomaly : emptyNormal;
+
+    emptyEl.style.display = 'none';
+
+    // Anomaly score label
+    const scoreLabel = isAnomaly
+      ? Math.round(score * 100) + '% anomaly score'
+      : Math.round((1 - score) * 100) + '% normal';
+
+    // Bar width — for anomaly show score%, for normal show inverse
+    const barWidth = isAnomaly ? Math.round(score * 100) : Math.round((1 - score) * 100);
+
+    const card = document.createElement('div');
+    card.className = `result-card ${type}`;
+    card.innerHTML = `
+      ${thumbSrc
+        ? `<img class="result-card-thumb" src="${thumbSrc}" alt="${name}" />`
+        : `<div class="result-card-thumb-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg></div>`
+      }
+      <div class="result-card-body">
+        <div class="result-card-name" title="${name}">${name}</div>
+        <div class="result-card-score-row">
+          <span class="result-card-badge">${isAnomaly ? 'Anomaly' : 'Normal'}</span>
+          <span class="result-card-score">${scoreLabel}</span>
+        </div>
+        <div class="score-bar-bg">
+          <div class="score-bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="result-card-footer">
+        <button class="btn-view">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          View Image
+        </button>
+      </div>
+    `;
+
+    // Animate score bar
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const bar = card.querySelector('.score-bar-fill');
+        if (bar) bar.style.width = barWidth + '%';
+      }, 100);
+    });
+
+    // Click anywhere on card or view button → open lightbox
+    card.addEventListener('click', () => openLightbox(thumbSrc, name, isAnomaly, score));
+
+    // Prepend so newest is at top
+    group.insertBefore(card, group.firstChild);
+  }
+</script>
+</body>
+</html>
+

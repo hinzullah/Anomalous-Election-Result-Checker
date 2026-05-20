@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# Environment variables
+.env
+.env.local
+
+# Model files (large files - optional, see guide)
+# Uncomment if you don't want to push model files
+# *.h5
+# *.pkl
+# *.joblib
+
+# Uploads and temporary files
+uploads/
+anomalies/
+normal/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Training outputs
+training_history.png
+
+# Logs
+*.log
