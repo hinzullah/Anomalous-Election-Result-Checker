@@ -8,10 +8,14 @@ import cv2
 Image.MAX_IMAGE_PIXELS = None
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# ✅ Relative path — works both locally and on Render
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ── Absolute paths — work both locally and on Render ──
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # create on startup, not per-request
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 model = load_model(os.path.join(BASE_DIR, 'anomaly_detection_model.keras'))
 
 def preprocess_image(image, target_size):
@@ -37,8 +41,14 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
+    # File size check — reject over 20MB before saving
+    file.seek(0, 2)
+    size_mb = file.tell() / (1024 * 1024)
+    file.seek(0)
+    if size_mb > 20:
+        return jsonify({'error': f'File too large ({size_mb:.1f} MB). Please upload under 20 MB.'}), 400
+
     try:
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(file_path)
 
@@ -60,6 +70,7 @@ def upload_file():
         })
 
     except Exception as e:
+        print(f"Upload error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/uploads/<filename>')
@@ -67,5 +78,4 @@ def send_uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     app.run(debug=True)
