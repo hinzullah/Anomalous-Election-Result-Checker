@@ -1,24 +1,23 @@
-# Ultra-minimal version for deployment
-# Use this if the full version causes build issues
-
-# Core Flask
+# Core Web Framework
 Flask==3.1.3
 gunicorn==21.2.0
+Werkzeug==3.1.8
 
-# Lighter ML option - choose ONE:
-# Option A: TensorFlow (larger, ~500MB)
-tensorflow-cpu==2.21.0  # CPU-only version (smaller)
-
-# Option B: scikit-learn (smaller, ~50MB)
-# scikit-learn==1.7.2
-# joblib==1.5.3
+# Machine Learning
+tensorflow==2.18.0
+numpy==1.26.4
+scikit-learn==1.5.2
+scikit-image==0.24.0
 
 # Image Processing
-opencv-python-headless==4.12.0.88  # Headless = no GUI dependencies
-Pillow==12.1.1
+opencv-python-headless==4.10.0.84
+Pillow==11.0.0
 
-# PDF Processing  
-pypdf==6.7.0
+# Data & Visualization
+matplotlib==3.9.2
+seaborn==0.13.2
 
-# Essential utilities
-numpy==2.2.6
+# Web Utilities
+requests==2.32.3
+beautifulsoup4==4.12.3
+
