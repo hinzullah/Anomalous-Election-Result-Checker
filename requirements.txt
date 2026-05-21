@@ -1,23 +1,26 @@
+
 # Core Web Framework
-Flask==3.1.3
+Flask==3.0.0
 gunicorn==21.2.0
-Werkzeug==3.1.8
 
 # Machine Learning
-tensorflow==2.18.0
-numpy==1.26.4
-scikit-learn==1.5.2
-scikit-image==0.24.0
+tensorflow==2.15.0
+numpy==1.26.0
+scikit-learn==1.3.2
 
 # Image Processing
-opencv-python-headless==4.10.0.84
-Pillow==11.0.0
+opencv-python-headless==4.8.1.78
+Pillow==10.1.0
 
-# Data & Visualization
-matplotlib==3.9.2
-seaborn==0.13.2
+# Data Processing
+pandas==2.1.4
+
+# Visualization
+matplotlib==3.8.2
+seaborn==0.13.0
 
 # Web Utilities
-requests==2.32.3
-beautifulsoup4==4.12.3
+requests==2.31.0
+beautifulsoup4==4.12.2
+
 
