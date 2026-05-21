@@ -10,17 +10,19 @@ Image.MAX_IMAGE_PIXELS = None
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-model = load_model('/home/hinzullah/Documents/FInal year project/anomaly_detection_model.h5')
+# ✅ Relative path — works both locally and on Render
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model = load_model(os.path.join(BASE_DIR, 'anomaly_detection_model.h5'))
 
 def preprocess_image(image, target_size):
     if image.mode != "L":
         image = image.convert("L")
     image = image.resize(target_size, Image.LANCZOS)
     image = np.array(image, dtype=np.float32)
-    image = cv2.GaussianBlur(image, (5, 5), 0)  # blur only, no Otsu
-    image = image / 255.0                        # normalise
-    image = np.expand_dims(image, axis=-1)       # → (128, 128, 1)
-    image = np.expand_dims(image, axis=0)        # → (1, 128, 128, 1)
+    image = cv2.GaussianBlur(image, (5, 5), 0)
+    image = image / 255.0
+    image = np.expand_dims(image, axis=-1)
+    image = np.expand_dims(image, axis=0)
     return image
 
 @app.route('/')
@@ -36,11 +38,12 @@ def upload_file():
         return jsonify({'error': 'No selected file'}), 400
 
     try:
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(file_path)
 
         image = Image.open(file_path)
-        image.thumbnail((4000, 4000), Image.LANCZOS)  # cap huge scans
+        image.thumbnail((4000, 4000), Image.LANCZOS)
         processed_image = preprocess_image(image, target_size=(128, 128))
 
         prediction = model.predict(processed_image)
