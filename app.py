@@ -12,7 +12,7 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # ✅ Relative path — works both locally and on Render
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-model = load_model(os.path.join(BASE_DIR, 'anomaly_detection_model.h5'))
+model = load_model(os.path.join(BASE_DIR, 'anomaly_detection_model.keras'))
 
 def preprocess_image(image, target_size):
     if image.mode != "L":
