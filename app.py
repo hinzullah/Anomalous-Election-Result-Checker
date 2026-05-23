@@ -4,16 +4,18 @@ from PIL import Image
 import numpy as np
 import os
 import cv2
+import tensorflow as tf
 
 Image.MAX_IMAGE_PIXELS = None
 
+# Limit TF to single thread — reduces RAM on free tier
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+
 app = Flask(__name__)
-
-# ── Absolute paths — work both locally and on Render ──
-BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # create on startup, not per-request
-
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 model = load_model(os.path.join(BASE_DIR, 'anomaly_detection_model.keras'))
@@ -53,7 +55,7 @@ def upload_file():
         file.save(file_path)
 
         image = Image.open(file_path)
-        image.thumbnail((4000, 4000), Image.LANCZOS)
+        image.thumbnail((1000, 1000), Image.LANCZOS)
         processed_image = preprocess_image(image, target_size=(128, 128))
 
         prediction = model.predict(processed_image)
