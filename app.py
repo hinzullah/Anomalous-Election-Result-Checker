@@ -1,24 +1,25 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template
-from tensorflow.keras.models import load_model  # type: ignore
 from PIL import Image
 import numpy as np
 import os
 import cv2
-import tensorflow as tf
+import tflite_runtime.interpreter as tflite
 
 Image.MAX_IMAGE_PIXELS = None
 
-# Limit TF to single thread — reduces RAM on free tier
-tf.config.threading.set_intra_op_parallelism_threads(1)
-tf.config.threading.set_inter_op_parallelism_threads(1)
-
 app = Flask(__name__)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-model = load_model(os.path.join(BASE_DIR, 'anomaly_detection_model.keras'))
+# Load TFLite model — uses ~50MB instead of ~400MB
+interpreter = tflite.Interpreter(
+    model_path=os.path.join(BASE_DIR, 'anomaly_detection_model.tflite')
+)
+interpreter.allocate_tensors()
+input_details  = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 def preprocess_image(image, target_size):
     if image.mode != "L":
@@ -43,12 +44,11 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    # File size check — reject over 20MB before saving
     file.seek(0, 2)
     size_mb = file.tell() / (1024 * 1024)
     file.seek(0)
     if size_mb > 20:
-        return jsonify({'error': f'File too large ({size_mb:.1f} MB). Please upload under 20 MB.'}), 400
+        return jsonify({'error': f'File too large ({size_mb:.1f} MB). Max 20MB.'}), 400
 
     try:
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
@@ -58,10 +58,12 @@ def upload_file():
         image.thumbnail((1000, 1000), Image.LANCZOS)
         processed_image = preprocess_image(image, target_size=(128, 128))
 
-        prediction = model.predict(processed_image)
-        print(f"Raw prediction score: {prediction}")
+        # TFLite inference
+        interpreter.set_tensor(input_details[0]['index'], processed_image)
+        interpreter.invoke()
+        score = float(interpreter.get_tensor(output_details[0]['index'])[0][0])
 
-        score = float(prediction[0][0])
+        print(f"Raw prediction score: {score}")
         result = 'Anomaly' if score > 0.3 else 'Normal'
 
         return jsonify({
